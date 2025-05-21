@@ -80,7 +80,7 @@ COPY --from=builder /app/.venv /app/.venv
 
 # In prod mode, switch to a non-root user
 RUN if [ "$MODE" = "prod" ]; then \
-    useradd -m -u 1000 appuser && \
+    useradd -m appuser && \
     chown -R appuser:appuser /app/.venv; \
     fi
 
