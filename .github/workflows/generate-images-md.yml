@@ -48,9 +48,17 @@ jobs:
             && echo "README.md updated" \
             || (echo "::error::README.md not updated!"; exit 1)
 
+      - name: Stage generated files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add assets/IMAGES.md README.md
+
       - name: Commit assets/IMAGES.md and README.md
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "chore: update assets/IMAGES.md and README.md"
-          file_pattern: "assets/IMAGES.md,README.md"
+          file_pattern: |
+            assets/IMAGES.md
+            README.md
           branch: main
