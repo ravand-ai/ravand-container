@@ -28,33 +28,32 @@ jobs:
       - name: Install yq & jq
         run: |
           sudo apt-get update && sudo apt-get install -y jq
-          wget -qO /usr/local/bin/yq \
-            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           chmod +x /usr/local/bin/yq
 
       - name: Expand matrix.yaml
         id: expand
         run: |
-          # Read matrix.yaml and expand into a JSON array of objects
-          read -r -d '' EXPRESSION << 'EOF'
-          [
-            .python[] as $p |
-            .extra[]  as $e |
-            .mode[]   as $m |
-            {
-              python: $p,
-              extra:  $e,
-              mode:   $m,
-              base:   .base_map[$e]
-            }
-          ]
-          EOF
-          MATRIX=$(yq eval -o=json "$EXPRESSION" .github/matrix.yaml)
-          {
-            echo "matrix<<EOF"
-            echo "$MATRIX"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+          # Build a JSON array of { python, extra, mode, base } entries
+            read -r -d '' EXPRESSION << 'EOF'
+            [
+              .python[] as $p |
+              .extra[]  as $e |
+              .mode[]   as $m |
+              {
+                python: $p,
+                extra:  $e,
+                mode:   $m,
+                base:   .base_map[$e]
+              }
+            ]
+            EOF
+                      MATRIX=$(yq eval -o=json "$EXPRESSION" .github/matrix.yaml)
+                      {
+                        echo "matrix<<EOF"
+                        echo "$MATRIX"
+                        echo "EOF"
+                      } >> $GITHUB_OUTPUT
 
   build:
     needs: set-matrix
