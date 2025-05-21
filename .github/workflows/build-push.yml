@@ -22,7 +22,8 @@ jobs:
     outputs:
       matrix: ${{ steps.expand.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Install yq & jq
         run: |
@@ -34,25 +35,27 @@ jobs:
       - name: Expand matrix.yaml
         id: expand
         run: |
-          # Read YAML and produce a JSON array of objects:
-          MATRIX=$(yq eval -o=json '
-            [
-              .python[] as $p |
-              .extra[] as $e |
-              .mode[] as $m |
-              {
-                python:     $p,
-                extra:      $e,
-                mode:       $m,
-                base:       .base_map[$e]
-              }
-            ]
-          ' .github/matrix.yaml)
-          {
-            echo "matrix<<EOF"
-            echo "${MATRIX}"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+          # Read matrix.yaml and expand into a JSON array of objects
+          read -r -d '' EXPRESSION << 'EOF'
+              [
+                .python[] as $p |
+                .extra[]  as $e |
+                .mode[]   as $m |
+                {
+                  python: $p,
+                  extra:  $e,
+                  mode:   $m,
+                  base:   .base_map[$e]
+                }
+              ]
+              EOF
+                        MATRIX=$(yq eval -o=json "$EXPRESSION" .github/matrix.yaml)
+                        # Emit via GITHUB_OUTPUT (multiline-safe)
+                        {
+                          echo "matrix<<EOF"
+                          echo "$MATRIX"
+                          echo "EOF"
+                        } >> $GITHUB_OUTPUT
 
   build:
     needs: set-matrix
