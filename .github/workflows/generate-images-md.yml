@@ -12,32 +12,49 @@ jobs:
   build-table:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
           persist-credentials: true
 
-      - name: Install Python deps
+      - name: Install Python & YAML support
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-pip
           pip3 install pyyaml
 
-      - name: Expand matrix & generate IMAGES.md
+      - name: Make scripts executable
+        run: |
+          chmod +x scripts/expand_matrix.py
+          chmod +x scripts/generate_table.py
+          chmod +x scripts/inject_table.py
+
+      - name: Expand matrix and generate assets/IMAGES.md
+        id: gen_table
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          # 1. Expand matrix into JSON
-          matrix_json=$(scripts/expand_matrix.py)
-          # 2. Generate the table Markdown
-          echo "$matrix_json" | scripts/generate_table.py
+          echo "▶ Running expand_matrix.py"
+          matrix_json=$(python3 scripts/expand_matrix.py)
+          echo "  → matrix_json: ${matrix_json}"
+          echo "▶ Running generate_table.py"
+          printf '%s' "$matrix_json" | python3 scripts/generate_table.py
+          if [[ ! -f assets/IMAGES.md ]]; then
+            echo "::error::assets/IMAGES.md not found after generation"
+            exit 1
+          fi
+          echo "  ✓ assets/IMAGES.md created with $(wc -l < assets/IMAGES.md) lines"
 
       - name: Inject table into README.md
         run: |
-          chmod +x scripts/inject_table.py
-          scripts/inject_table.py
+          echo "▶ Running inject_table.py"
+          python3 scripts/inject_table.py
+          # Verify README now contains the table
+          grep -q '| Python |' README.md \
+            && echo "  ✓ README.md updated" \
+            || (echo "::error::README.md did not get updated!"; exit 1)
 
-      - name: Commit assets/IMAGES.md and README.md
+      - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "chore: update assets/IMAGES.md and README.md"
