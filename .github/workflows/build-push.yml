@@ -11,9 +11,9 @@ env:
   IMAGE: ${{ github.repository }}
 
 permissions:
-  contents:   read
-  packages:   write
-  id-token:   write
+  contents:    read
+  packages:    write
+  id-token:    write
   attestations: write
 
 jobs:
@@ -25,26 +25,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install yq & jq
-        run: |
-          sudo apt-get update && sudo apt-get install -y jq
-          wget -qO /usr/local/bin/yq \
-            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-          chmod +x /usr/local/bin/yq
-
-      - name: Expand matrix.yaml
+      - name: Expand matrix.yaml with Python
         id: expand
         run: |
-          # Define a one-line yq filter
-          EXPRESSION='[.python[] as $p | .extra[] as $e | .mode[] as $m | {python: $p, extra: $e, mode: $m, base: .base_map[$e]}]'
-          # Evaluate into JSON array
-          MATRIX=$(yq eval -o=json "$EXPRESSION" .github/matrix.yaml)
-          # Publish as multiline output
-          {
-            echo "matrix<<EOF"
-            echo "$MATRIX"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+            python3 - << 'EOF'
+            import yaml, json, os
+
+            # Load matrix.yaml
+            with open('.github/matrix.yaml') as f:
+                cfg = yaml.safe_load(f)
+
+            # Build list of dicts
+            matrix = []
+            for p in cfg['python']:
+                for e in cfg['extra']:
+                    for m in cfg['mode']:
+                        matrix.append({
+                            'python': p,
+                            'extra':  e,
+                            'mode':   m,
+                            'base':   cfg['base_map'][e]
+                        })
+
+            # Emit in GITHUB_OUTPUT format
+            print("matrix<<EOF")
+            print(json.dumps(matrix))
+            print("EOF")
+            EOF
+                      # Capture output into GITHUB_OUTPUT
+        shell: bash
 
   build:
     needs: set-matrix
@@ -82,7 +91,6 @@ jobs:
             type=ref,event=tag
 
       - name: Build & Push
-        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
