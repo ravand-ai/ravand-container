@@ -28,32 +28,21 @@ jobs:
       - name: Expand matrix.yaml with Python
         id: expand
         run: |
-            python3 - << 'EOF'
-            import yaml, json, os
-
-            # Load matrix.yaml
-            with open('.github/matrix.yaml') as f:
-                cfg = yaml.safe_load(f)
-
-            # Build list of dicts
-            matrix = []
-            for p in cfg['python']:
-                for e in cfg['extra']:
-                    for m in cfg['mode']:
-                        matrix.append({
-                            'python': p,
-                            'extra':  e,
-                            'mode':   m,
-                            'base':   cfg['base_map'][e]
-                        })
-
-            # Emit in GITHUB_OUTPUT format
-            print("matrix<<EOF")
+          # Read YAML, build matrix list, dump JSON in one shot
+          matrix_json=$(python3 - << 'PYCODE'
+            import yaml, json
+            cfg = yaml.safe_load(open('.github/matrix.yaml'))
+            matrix = [
+                { 'python': p, 'extra': e, 'mode': m, 'base': cfg['base_map'][e] }
+                for p in cfg['python']
+                for e in cfg['extra']
+                for m in cfg['mode']
+            ]
             print(json.dumps(matrix))
-            print("EOF")
-            EOF
-                      # Capture output into GITHUB_OUTPUT
-        shell: bash
+            PYCODE
+                      )
+                      # Emit to GITHUB_OUTPUT in a single line so fromJson() works
+          echo "matrix=$matrix_json" >> $GITHUB_OUTPUT
 
   build:
     needs: set-matrix
@@ -91,6 +80,7 @@ jobs:
             type=ref,event=tag
 
       - name: Build & Push
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
