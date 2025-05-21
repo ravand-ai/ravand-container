@@ -14,16 +14,21 @@ jobs:
     outputs:
       matrix: ${{ steps.read.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Install yq
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install yq & jq
         run: |
           sudo apt-get update && sudo apt-get install -y jq
-          wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           chmod +x /usr/local/bin/yq
+
       - name: Read matrix.yaml
         id: read
         run: |
-          echo "::set-output name=matrix::$(yq eval -o=json .github/matrix.yaml)"
+          MATRIX_JSON=$(yq eval -o=json .github/matrix.yaml)
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
   build-table:
     needs: set-matrix
@@ -34,8 +39,11 @@ jobs:
     steps:
       - name: Build MD table fragment
         run: |
-          # header only on first combination
-          if [ "${{ matrix.python }}" = "3.10" ] && [ "${{ matrix.extra }}" = "cpu" ] && [ "${{ matrix.mode }}" = "dev" ] && [ "${{ matrix.base }}" = "debian:bullseye-slim" ]; then
+          # On the first combination, emit header
+          if [ "${{ matrix.python }}" = "3.10" ] && \
+             [ "${{ matrix.extra }}" = "cpu" ] && \
+             [ "${{ matrix.mode }}" = "dev" ] && \
+             [ "${{ matrix.base }}" = "debian:bullseye-slim" ]; then
             cat > IMAGES.md << 'EOF'
             | Python | Variant | Mode | Base Image | Tags |
             |--------|---------|------|------------|------|

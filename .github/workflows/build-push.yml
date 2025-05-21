@@ -22,16 +22,21 @@ jobs:
     outputs:
       matrix: ${{ steps.read.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Install yq & jq
         run: |
           sudo apt-get update && sudo apt-get install -y jq
-          wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           chmod +x /usr/local/bin/yq
+
       - name: Read matrix.yaml
         id: read
         run: |
-          echo "::set-output name=matrix::$(yq eval -o=json .github/matrix.yaml)"
+          MATRIX_JSON=$(yq eval -o=json .github/matrix.yaml)
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
   build:
     needs: set-matrix
