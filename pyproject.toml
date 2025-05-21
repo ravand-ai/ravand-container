@@ -11,18 +11,17 @@ dependencies = [
 
 [project.optional-dependencies]
 cpu = [
-  "torch>=2.7.0+cpu",
-  "torchvision>=0.22.0+cpu",
-  "torchaudio>=2.7.0+cpu",
+  "torch>=2.7.0",
+  "torchvision>=0.22.0",
+  "torchaudio>=2.7.0",
 ]
 cu124 = [
-  "torch>=2.7.0+cu124",
-  "torchvision>=0.22.0+cu124",
-  "torchaudio>=2.7.0+cu124",
+  "torch>=2.7.0",
+  "torchvision>=0.22.0",
+  "torchaudio>=2.7.0",
 ]
 
 [tool.uv]
-# Define your two custom PyTorch indexes
 [[tool.uv.index]]
 name     = "pytorch-cpu"
 url      = "https://download.pytorch.org/whl/cpu"
@@ -33,7 +32,6 @@ name     = "pytorch-cu124"
 url      = "https://download.pytorch.org/whl/cu124"
 explicit = true
 
-# Map each package to the right index via an "extra" marker
 [tool.uv.sources]
 torch = [
   { index = "pytorch-cpu",  marker = "extra == 'cpu'" },
