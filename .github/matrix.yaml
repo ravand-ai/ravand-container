@@ -2,12 +2,16 @@ python:
   - "3.10"
   - "3.11"
   - "3.12"
+
 extra:
   - cpu
   - cu124
+
 mode:
   - dev
   - prod
-base:
-  - debian:bullseye-slim
-  - nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04
+
+# Map each 'extra' to its correct base
+base_map:
+  cpu: debian:bullseye-slim
+  cu124: nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04

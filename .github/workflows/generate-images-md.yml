@@ -12,7 +12,7 @@ jobs:
   set-matrix:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.read.outputs.matrix }}
+      matrix: ${{ steps.expand.outputs.matrix }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,13 +24,25 @@ jobs:
             https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           chmod +x /usr/local/bin/yq
 
-      - name: Read matrix.yaml
-        id: read
+      - name: Expand matrix.yaml
+        id: expand
         run: |
-          MATRIX_JSON=$(yq eval -o=json .github/matrix.yaml)
+          MATRIX=$(yq eval -o=json '
+            [
+              .python[] as $p |
+              .extra[] as $e |
+              .mode[] as $m |
+              {
+                python: $p,
+                extra:  $e,
+                mode:   $m,
+                base:   .base_map[$e]
+              }
+            ]
+          ' .github/matrix.yaml)
           {
             echo "matrix<<EOF"
-            echo "${MATRIX_JSON}"
+            echo "${MATRIX}"
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
@@ -39,7 +51,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-
     steps:
       - name: Build MD table fragment
         run: |
@@ -69,12 +80,12 @@ jobs:
 
       - name: Insert images table into README.md
         run: |
-          # extract sections
+          # Extract the content before and after the markers
           sed -n '/<!-- IMAGES_TABLE_START -->/,/<!-- IMAGES_TABLE_END -->/p' README.md > before.tmp
           sed -n '/<!-- IMAGES_TABLE_END -->/,$p' README.md > after.tmp
-          # extract just the table
+          # Extract only the generated table
           sed -n '/^| Python/,/^$/p' assets/IMAGES.md > table.tmp
-          # stitch together
+          # Reassemble README.md with new table
           cat before.tmp table.tmp after.tmp > README.md
           rm before.tmp table.tmp after.tmp
 

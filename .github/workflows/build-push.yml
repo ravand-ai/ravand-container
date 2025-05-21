@@ -20,22 +20,37 @@ jobs:
   set-matrix:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.read.outputs.matrix }}
+      matrix: ${{ steps.expand.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Install yq & jq
         run: |
           sudo apt-get update && sudo apt-get install -y jq
           wget -qO /usr/local/bin/yq \
             https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           chmod +x /usr/local/bin/yq
-      - name: Read matrix.yaml
-        id: read
+
+      - name: Expand matrix.yaml
+        id: expand
         run: |
-          MATRIX_JSON=$(yq eval -o=json .github/matrix.yaml)
+          # Read YAML and produce a JSON array of objects:
+          MATRIX=$(yq eval -o=json '
+            [
+              .python[] as $p |
+              .extra[] as $e |
+              .mode[] as $m |
+              {
+                python:     $p,
+                extra:      $e,
+                mode:       $m,
+                base:       .base_map[$e]
+              }
+            ]
+          ' .github/matrix.yaml)
           {
             echo "matrix<<EOF"
-            echo "${MATRIX_JSON}"
+            echo "${MATRIX}"
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
@@ -94,14 +109,11 @@ jobs:
       # - name: Verify dependencies in image
       #   run: |
       #     IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE }}:py${{ matrix.python }}-${{ matrix.extra }}-${{ matrix.mode }}"
-      #     echo "→ Running pip check in $IMAGE_TAG"
       #     docker run --rm "$IMAGE_TAG" /app/.venv/bin/pip check
-
-      #     echo "→ Running import‐smoke test in $IMAGE_TAG"
       #     docker run --rm "$IMAGE_TAG" /app/.venv/bin/python - << 'EOF'
-      #       import torch, transformers, numpy, scipy
-      #       print("✔️ All dependencies import successfully")
-      #       EOF
+      #     import torch, transformers, numpy, scipy
+      #     print("✔️ Imports OK")
+      #     EOF
 
       - name: Attest Provenance
         if: success()
