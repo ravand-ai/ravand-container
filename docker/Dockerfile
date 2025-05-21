@@ -17,6 +17,12 @@ FROM ghcr.io/astral-sh/uv:0.7.6 AS uvbin
 # BUILDER STAGE — install Python via uv, then deps via uv
 ############################################################
 FROM ${BASE_IMAGE} AS builder
+
+# Bring global ARGs into this stage’s scope
+ARG PYTHON_VERSION
+ARG EXTRA
+ARG MODE
+
 LABEL org.opencontainers.image.source="https://github.com/<OWNER>/<REPO>"
 
 # Bring in uv & uvx
@@ -35,7 +41,11 @@ RUN apt-get update && \
 WORKDIR /app
 COPY pyproject.toml ./
 
-# Generate lock and sync dependencies
+# 1️⃣ Install the requested Python interpreter so uv has a runtime
+RUN --mount=type=cache,target=/root/.cache \
+    uv python install ${PYTHON_VERSION} --preview --default    # uv Python installer :contentReference[oaicite:2]{index=2}
+
+# 2️⃣ Generate lockfile, sync & (in dev) compile
 RUN --mount=type=cache,target=/root/.cache \
     uv lock && \
     if [ "$MODE" = "dev" ]; then \
@@ -48,11 +58,13 @@ RUN --mount=type=cache,target=/root/.cache \
 ############################################################
 # FINAL STAGE — runtime image
 ############################################################
-# Re-declare BASE_IMAGE (no default) so Docker picks up the previous value
+# Re-declare BASE_IMAGE so Docker picks up the same build-arg :contentReference[oaicite:3]{index=3}
 ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS final
+
+# Bring MODE into this stage
 ARG MODE
 
-FROM ${BASE_IMAGE} AS final
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     VIRTUAL_ENV=/app/.venv \
