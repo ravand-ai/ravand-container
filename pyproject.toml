@@ -37,13 +37,13 @@ explicit = true
 [tool.uv.sources]
 torch = [
   { index = "pytorch-cpu",  marker = "extra == 'cpu'" },
-  { index = "pytorch-cu124", marker = "extra == 'cu124'" },
+  { index = "pytorch-cu124", marker = "extra != 'cpu' and extra == 'cu124'" },
 ]
 torchvision = [
   { index = "pytorch-cpu",  marker = "extra == 'cpu'" },
-  { index = "pytorch-cu124", marker = "extra == 'cu124'" },
+  { index = "pytorch-cu124", marker = "extra != 'cpu' and extra == 'cu124'" },
 ]
 torchaudio = [
   { index = "pytorch-cpu",  marker = "extra == 'cpu'" },
-  { index = "pytorch-cu124", marker = "extra == 'cu124'" },
+  { index = "pytorch-cu124", marker = "extra != 'cpu' and extra == 'cu124'" },
 ]
