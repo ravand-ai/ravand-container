@@ -93,16 +93,15 @@ jobs:
 
       - name: Verify dependencies in image
         run: |
-          # Build the exact tag we pushed
           IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE }}:py${{ matrix.python }}-${{ matrix.extra }}-${{ matrix.mode }}"
-          echo "→ Running pip check and import tests in $IMAGE_TAG"
-          docker run --rm "$IMAGE_TAG" bash -l -c '
-            set -euo pipefail
-            pip check
-            python - << "PYCODE"
-              import torch, transformers, numpy, scipy
-              print("✔️ All dependencies import successfully")
-              PYCODE
+          echo "→ Running pip check in $IMAGE_TAG"
+          docker run --rm "$IMAGE_TAG" pip check
+
+          echo "→ Running import‐smoke test in $IMAGE_TAG"
+          docker run --rm "$IMAGE_TAG" python - << 'EOF'
+            import torch, transformers, numpy, scipy
+            print("✔️ All dependencies import successfully")
+            EOF
 
       - name: Attest Provenance
         if: success()
