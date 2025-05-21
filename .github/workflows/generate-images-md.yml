@@ -1,43 +1,98 @@
-name: Generate IMAGES.md and update README
+name: Build & Push CPU/GPU Dev/Prod Images
 
 on:
-  workflow_run:
-    workflows: ["Build & Push CPU/GPU Dev/Prod Images"]
-    types: [completed]
+  push:
+    branches: [ main ]
+    tags:    [ 'v*.*.*' ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository }}
 
 permissions:
-  contents: write
+  contents:     read
+  packages:     write
+  id-token:     write
+  attestations: write
 
 jobs:
-  build-table:
+  set-matrix:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.expand.outputs.matrix }}
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          persist-credentials: true
 
-      - name: Ensure Python deps
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-yaml
+          sudo apt-get install -y python3-pip
+          pip3 install pyyaml
 
-      - name: Expand matrix & generate IMAGES.md
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+      - name: Expand matrix.yaml
+        id: expand
         run: |
-          # 1. Expand matrix into JSON and pipe into table generator
-          matrix_json=$(./scripts/expand_matrix.py)
-          echo "$matrix_json" | ./scripts/generate_table.py
+          matrix_json=$(python3 scripts/expand_matrix.py)
+          echo "matrix=$matrix_json" >> $GITHUB_OUTPUT
 
-      - name: Inject table into README.md
-        run: |
-          chmod +x scripts/inject_table.py
-          scripts/inject_table.py
+  build:
+    needs: set-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
 
-      - name: Commit assets/IMAGES.md and README.md
-        uses: stefanzweifel/git-auto-commit-action@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
         with:
-          commit_message: "chore: update assets/IMAGES.md and README.md"
-          file_pattern: "assets/IMAGES.md,README.md"
-          branch: main
+          driver: docker-container
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          tags: |
+            type=raw,value=py${{ matrix.python }}-${{ matrix.extra }}-${{ matrix.mode }}
+            type=sha,format=short,prefix=sha-
+            type=ref,event=tag
+
+      - name: Build & Push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          build-args: |
+            BASE_IMAGE=${{ matrix.base }}
+            PYTHON_VERSION=${{ matrix.python }}
+            EXTRA=${{ matrix.extra }}
+            MODE=${{ matrix.mode }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+
+      - name: Attest Provenance
+        if: success()
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name:   ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
