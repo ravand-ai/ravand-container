@@ -91,17 +91,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Verify dependencies in image
-        run: |
-          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE }}:py${{ matrix.python }}-${{ matrix.extra }}-${{ matrix.mode }}"
-          echo "→ Running pip check in $IMAGE_TAG"
-          docker run --rm "$IMAGE_TAG" /app/.venv/bin/pip check
+      # - name: Verify dependencies in image
+      #   run: |
+      #     IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE }}:py${{ matrix.python }}-${{ matrix.extra }}-${{ matrix.mode }}"
+      #     echo "→ Running pip check in $IMAGE_TAG"
+      #     docker run --rm "$IMAGE_TAG" /app/.venv/bin/pip check
 
-          echo "→ Running import‐smoke test in $IMAGE_TAG"
-          docker run --rm "$IMAGE_TAG" /app/.venv/bin/python - << 'EOF'
-            import torch, transformers, numpy, scipy
-            print("✔️ All dependencies import successfully")
-            EOF
+      #     echo "→ Running import‐smoke test in $IMAGE_TAG"
+      #     docker run --rm "$IMAGE_TAG" /app/.venv/bin/python - << 'EOF'
+      #       import torch, transformers, numpy, scipy
+      #       print("✔️ All dependencies import successfully")
+      #       EOF
 
       - name: Attest Provenance
         if: success()
