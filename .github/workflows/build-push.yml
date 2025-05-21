@@ -14,6 +14,7 @@ permissions:
   contents: read
   packages: write
   id-token: write
+  attestations: write      # <— needed for attest-build-provenance
 
 jobs:
   build-and-push:
@@ -22,9 +23,11 @@ jobs:
       fail-fast: true
       matrix:
         python: [ '3.10', '3.11', '3.12' ]
-        extra: [ cpu, cu124 ]
-        mode: [ dev, prod ]
-        base: [ debian:bullseye-slim, nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04]
+        extra:   [ cpu, cu124 ]
+        mode:    [ dev, prod ]
+        base:
+          - debian:bullseye-slim
+          - nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04
 
     steps:
       - name: Checkout
@@ -55,6 +58,7 @@ jobs:
             type=ref,event=tag
 
       - name: Build & Push
+        id: build                           # <— add an id here
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -74,6 +78,6 @@ jobs:
         if: success()
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE }}
-          subject-digest: ${{ steps.build-and-push.outputs.digest }}
+          subject-name:   ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}   
           push-to-registry: true
