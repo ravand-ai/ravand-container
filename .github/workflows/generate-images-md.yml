@@ -14,21 +14,22 @@ jobs:
     outputs:
       matrix: ${{ steps.read.outputs.matrix }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Install yq & jq
         run: |
           sudo apt-get update && sudo apt-get install -y jq
           wget -qO /usr/local/bin/yq \
             https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           chmod +x /usr/local/bin/yq
-
       - name: Read matrix.yaml
         id: read
         run: |
           MATRIX_JSON=$(yq eval -o=json .github/matrix.yaml)
-          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+          {
+            echo "matrix<<EOF"
+            echo "${MATRIX_JSON}"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
   build-table:
     needs: set-matrix
@@ -39,7 +40,7 @@ jobs:
     steps:
       - name: Build MD table fragment
         run: |
-          # On the first combination, emit header
+          # Header only once
           if [ "${{ matrix.python }}" = "3.10" ] && \
              [ "${{ matrix.extra }}" = "cpu" ] && \
              [ "${{ matrix.mode }}" = "dev" ] && \
@@ -52,8 +53,8 @@ jobs:
           echo "| ${{ matrix.python }} | ${{ matrix.extra }} | ${{ matrix.mode }} | ${{ matrix.base }} | ghcr.io/${{ github.repository }}:py${{ matrix.python }}-${{ matrix.extra }}-${{ matrix.mode }} |" \
             >> IMAGES.md
 
-      - name: Checkout for docs update
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        name: Checkout for docs update
         with:
           persist-credentials: true
 
@@ -64,8 +65,8 @@ jobs:
           sed -n '/<!-- IMAGES_TABLE_END -->/,$p' README.md > after.tmp
           cat before.tmp table.tmp after.tmp > README.md
 
-      - name: Commit IMAGES.md and README.md
-        uses: stefanzweifel/git-auto-commit-action@v4
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        name: Commit IMAGES.md and README.md
         with:
           commit_message: "chore: update IMAGES.md and README.md"
           file_pattern: "IMAGES.md,README.md"
