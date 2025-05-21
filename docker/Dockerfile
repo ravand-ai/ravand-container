@@ -49,10 +49,10 @@ RUN --mount=type=cache,target=/root/.cache \
 RUN --mount=type=cache,target=/root/.cache \
     uv lock && \
     if [ "$MODE" = "dev" ]; then \
-    uv sync --locked --extra ${EXTRA} --group default,dev && \
+    uv sync --locked --extra ${EXTRA}  && \
     uv compile /app/.venv/lib/python*/site-packages; \
     else \
-    uv sync --locked --extra ${EXTRA} --group default; \
+    uv sync --locked --extra ${EXTRA}; \
     fi
 
 ############################################################
