@@ -41,19 +41,14 @@ RUN apt-get update && \
 WORKDIR /app
 COPY pyproject.toml ./
 
-# Install Python so uv commands have an interpreter
+# install Python interpreter
 RUN --mount=type=cache,target=/root/.cache \
-    uv python install ${PYTHON_VERSION} --preview --default  # fetch CPython via uv :contentReference[oaicite:3]{index=3}
+    uv python install ${PYTHON_VERSION} --preview --default
 
-# Lock, sync & (in dev) compile
+# lock & sync (compile-bytecode=true in pyproject.toml does the .pyc step)
 RUN --mount=type=cache,target=/root/.cache \
     uv lock && \
-    if [ "$MODE" = "dev" ]; then \
-    uv sync --locked --extra ${EXTRA}  && \
-    uv compile /app/.venv/lib/python*/site-packages; \
-    else \
-    uv sync --locked --extra ${EXTRA}; \
-    fi
+    uv sync --locked --extra ${EXTRA}
 
 ############################################################
 # FINAL STAGE
