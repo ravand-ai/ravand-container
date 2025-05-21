@@ -10,7 +10,7 @@ END = "<!-- IMAGES_TABLE_END -->"
 text = open(README).read().splitlines()
 
 # Load table (just the lines starting with '|')
-table_lines = [l for l in open(TABLE) if l.startswith("|")]
+table_lines = [l for l in open(TABLE) if l.startswith("|")]  # noqa: E741
 
 out = []
 inside = False
@@ -29,4 +29,4 @@ for line in text:
 
 # Write back
 with open(README, "w") as f:
-    f.write("\n".join(out) + "\n")
+    f.write("\n".join(out))
