@@ -37,25 +37,24 @@ jobs:
         run: |
           # Read matrix.yaml and expand into a JSON array of objects
           read -r -d '' EXPRESSION << 'EOF'
-              [
-                .python[] as $p |
-                .extra[]  as $e |
-                .mode[]   as $m |
-                {
-                  python: $p,
-                  extra:  $e,
-                  mode:   $m,
-                  base:   .base_map[$e]
-                }
-              ]
-              EOF
-                        MATRIX=$(yq eval -o=json "$EXPRESSION" .github/matrix.yaml)
-                        # Emit via GITHUB_OUTPUT (multiline-safe)
-                        {
-                          echo "matrix<<EOF"
-                          echo "$MATRIX"
-                          echo "EOF"
-                        } >> $GITHUB_OUTPUT
+          [
+            .python[] as $p |
+            .extra[]  as $e |
+            .mode[]   as $m |
+            {
+              python: $p,
+              extra:  $e,
+              mode:   $m,
+              base:   .base_map[$e]
+            }
+          ]
+          EOF
+          MATRIX=$(yq eval -o=json "$EXPRESSION" .github/matrix.yaml)
+          {
+            echo "matrix<<EOF"
+            echo "$MATRIX"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
   build:
     needs: set-matrix
@@ -108,15 +107,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      # - name: Verify dependencies in image
-      #   run: |
-      #     IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE }}:py${{ matrix.python }}-${{ matrix.extra }}-${{ matrix.mode }}"
-      #     docker run --rm "$IMAGE_TAG" /app/.venv/bin/pip check
-      #     docker run --rm "$IMAGE_TAG" /app/.venv/bin/python - << 'EOF'
-      #     import torch, transformers, numpy, scipy
-      #     print("✔️ Imports OK")
-      #     EOF
 
       - name: Attest Provenance
         if: success()
