@@ -1,0 +1,64 @@
+name: Generate IMAGES.md and update README
+
+on:
+  workflow_run:
+    workflows: ["Build & Push CPU/GPU Dev/Prod Images"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  set-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.read.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yq
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
+      - name: Read matrix.yaml
+        id: read
+        run: |
+          echo "::set-output name=matrix::$(yq eval -o=json .github/matrix.yaml)"
+
+  build-table:
+    needs: set-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+
+    steps:
+      - name: Build MD table fragment
+        run: |
+          # header only on first combination
+          if [ "${{ matrix.python }}" = "3.10" ] && [ "${{ matrix.extra }}" = "cpu" ] && [ "${{ matrix.mode }}" = "dev" ] && [ "${{ matrix.base }}" = "debian:bullseye-slim" ]; then
+            cat > IMAGES.md << 'EOF'
+            | Python | Variant | Mode | Base Image | Tags |
+            |--------|---------|------|------------|------|
+            EOF
+          fi
+          echo "| ${{ matrix.python }} | ${{ matrix.extra }} | ${{ matrix.mode }} | ${{ matrix.base }} | ghcr.io/${{ github.repository }}:py${{ matrix.python }}-${{ matrix.extra }}-${{ matrix.mode }} |" \
+            >> IMAGES.md
+
+      - name: Checkout for docs update
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Insert images table into README.md
+        run: |
+          sed -n '/<!-- IMAGES_TABLE_START -->/,/<!-- IMAGES_TABLE_END -->/p' README.md > before.tmp
+          sed -n '/^| Python/,/^$/p' IMAGES.md > table.tmp
+          sed -n '/<!-- IMAGES_TABLE_END -->/,$p' README.md > after.tmp
+          cat before.tmp table.tmp after.tmp > README.md
+
+      - name: Commit IMAGES.md and README.md
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "chore: update IMAGES.md and README.md"
+          file_pattern: "IMAGES.md,README.md"
+          branch: main
