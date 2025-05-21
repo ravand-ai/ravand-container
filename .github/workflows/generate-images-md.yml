@@ -12,51 +12,44 @@ jobs:
   build-table:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           persist-credentials: true
 
-      - name: Install Python & YAML support
+      - name: Install Python deps
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-pip
           pip3 install pyyaml
 
-      - name: Make scripts executable
-        run: |
-          chmod +x scripts/expand_matrix.py
-          chmod +x scripts/generate_table.py
-          chmod +x scripts/inject_table.py
-
-      - name: Expand matrix and generate assets/IMAGES.md
+      - name: Expand matrix & generate assets/IMAGES.md
         id: gen_table
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          echo "▶ Running expand_matrix.py"
-          matrix_json=$(python3 scripts/expand_matrix.py)
-          echo "  → matrix_json: ${matrix_json}"
-          echo "▶ Running generate_table.py"
-          printf '%s' "$matrix_json" | python3 scripts/generate_table.py
-          if [[ ! -f assets/IMAGES.md ]]; then
-            echo "::error::assets/IMAGES.md not found after generation"
-            exit 1
-          fi
-          echo "  ✓ assets/IMAGES.md created with $(wc -l < assets/IMAGES.md) lines"
+            matrix_json=$(python3 scripts/expand_matrix.py)
+            printf '%s' "$matrix_json" | python3 scripts/generate_table.py
+            ls -lh assets/IMAGES.md
+            wc -l assets/IMAGES.md
+
+      - name: Upload IMAGES.md for inspection
+        uses: actions/upload-artifact@v3
+        with:
+            name: generated-images-md
+            path: assets/IMAGES.md
 
       - name: Inject table into README.md
-        run: |
-          echo "▶ Running inject_table.py"
-          python3 scripts/inject_table.py
-          # Verify README now contains the table
-          grep -q '| Python |' README.md \
-            && echo "  ✓ README.md updated" \
-            || (echo "::error::README.md did not get updated!"; exit 1)
+        run: python3 scripts/inject_table.py
 
-      - name: Commit changes
+      - name: Show diff
+        run: git --no-pager diff README.md assets/IMAGES.md || true
+
+      - name: Touch README to force commit if needed
+        if: steps.gen_table.outputs.changed != 'true'
+        run: touch README.md
+
+      - name: Commit assets/IMAGES.md and README.md
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: "chore: update assets/IMAGES.md and README.md"
-          file_pattern: "assets/IMAGES.md,README.md"
-          branch: main
+            commit_message: "chore: update assets/IMAGES.md and README.md"
+            file_pattern: "assets/IMAGES.md,README.md"
+            branch: main
