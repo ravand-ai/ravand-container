@@ -1,20 +1,12 @@
-name: Build & Push CPU/GPU Dev/Prod Images
+name: Generate IMAGES.md and update README
 
 on:
-  push:
-    branches: [ main ]
-    tags:    [ 'v*.*.*' ]
-  workflow_dispatch:
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE: ${{ github.repository }}
+  workflow_run:
+    workflows: ["Build & Push CPU/GPU Dev/Prod Images"]
+    types: [completed]
 
 permissions:
-  contents:     read
-  packages:     write
-  id-token:     write
-  attestations: write
+  contents: write
 
 jobs:
   set-matrix:
@@ -25,74 +17,81 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install yq & jq
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip
-          pip3 install pyyaml
+          sudo apt-get update && sudo apt-get install -y jq
+          wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
 
       - name: Expand matrix.yaml
         id: expand
         run: |
-          matrix_json=$(python3 scripts/expand_matrix.py)
-          echo "matrix=$matrix_json" >> $GITHUB_OUTPUT
+          MATRIX=$(yq eval -o=json '
+            [
+              .python[] as $p |
+              .extra[] as $e |
+              .mode[] as $m |
+              {
+                python: $p,
+                extra:  $e,
+                mode:   $m,
+                base:   .base_map[$e]
+              }
+            ]
+          ' .github/matrix.yaml)
+          {
+            echo "matrix<<EOF"
+            echo "${MATRIX}"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
-  build:
+  build-table:
     needs: set-matrix
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     steps:
-      - name: Checkout
+      - name: Build MD table fragment
+        run: |
+          mkdir -p assets
+          # Header only once
+          if [ "${{ matrix.python }}" = "3.10" ] && \
+             [ "${{ matrix.extra }}" = "cpu" ] && \
+             [ "${{ matrix.mode }}" = "dev" ] && \
+             [ "${{ matrix.base }}" = "debian:bullseye-slim" ]; then
+            cat > assets/IMAGES.md << 'EOF'
+            | Python | Variant | Mode | Base Image | Tags |
+            |--------|---------|------|------------|------|
+            EOF
+          fi
+          # Append this row
+          echo "| ${{ matrix.python }} | ${{ matrix.extra }} | ${{ matrix.mode }} | ${{ matrix.base }} | ghcr.io/${{ github.repository }}:py${{ matrix.python }}-${{ matrix.extra }}-${{ matrix.mode }} |" \
+            >> assets/IMAGES.md
+
+  update-readme:
+    needs: build-table
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout for docs update
         uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
         with:
-          driver: docker-container
+          persist-credentials: true
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Insert images table into README.md
+        run: |
+          # Extract the content before and after the markers
+          sed -n '/<!-- IMAGES_TABLE_START -->/,/<!-- IMAGES_TABLE_END -->/p' README.md > before.tmp
+          sed -n '/<!-- IMAGES_TABLE_END -->/,$p' README.md > after.tmp
+          # Extract only the generated table
+          sed -n '/^| Python/,/^$/p' assets/IMAGES.md > table.tmp
+          # Reassemble README.md with new table
+          cat before.tmp table.tmp after.tmp > README.md
+          rm before.tmp table.tmp after.tmp
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: Commit assets/IMAGES.md and README.md
+        uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
-          tags: |
-            type=raw,value=py${{ matrix.python }}-${{ matrix.extra }}-${{ matrix.mode }}
-            type=sha,format=short,prefix=sha-
-            type=ref,event=tag
-
-      - name: Build & Push
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/Dockerfile
-          build-args: |
-            BASE_IMAGE=${{ matrix.base }}
-            PYTHON_VERSION=${{ matrix.python }}
-            EXTRA=${{ matrix.extra }}
-            MODE=${{ matrix.mode }}
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-
-      - name: Attest Provenance
-        if: success()
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-name:   ${{ env.REGISTRY }}/${{ env.IMAGE }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
+          commit_message: "chore: update assets/IMAGES.md and README.md"
+          file_pattern: "assets/IMAGES.md,README.md"
+          branch: main
