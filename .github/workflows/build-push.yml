@@ -6,42 +6,23 @@ on:
     tags:    [ 'v*.*.*' ]
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE: ${{ github.repository }}
-
-permissions:
-  contents:    read
-  packages:    write
-  id-token:    write
-  attestations: write
-
 jobs:
   set-matrix:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.expand.outputs.matrix }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Expand matrix.yaml with Python
+      - name: Install deps for expand script
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml
+
+      - name: Expand matrix.yaml
         id: expand
         run: |
-          # Read YAML, build matrix list, dump JSON in one shot
-          matrix_json=$(python3 - << 'PYCODE'
-            import yaml, json
-            cfg = yaml.safe_load(open('.github/matrix.yaml'))
-            matrix = [
-                { 'python': p, 'extra': e, 'mode': m, 'base': cfg['base_map'][e] }
-                for p in cfg['python']
-                for e in cfg['extra']
-                for m in cfg['mode']
-            ]
-            print(json.dumps(matrix))
-            PYCODE
-                      )
-                      # Emit to GITHUB_OUTPUT in a single line so fromJson() works
+          matrix_json=$(./scripts/expand_matrix.py)
           echo "matrix=$matrix_json" >> $GITHUB_OUTPUT
 
   build:
@@ -49,23 +30,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
         with:
           driver: docker-container
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -73,14 +47,13 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=py${{ matrix.python }}-${{ matrix.extra }}-${{ matrix.mode }}
             type=sha,format=short,prefix=sha-
             type=ref,event=tag
 
-      - name: Build & Push
-        id: build
+      - name: Build & Push Image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -93,13 +66,11 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Attest Provenance
         if: success()
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name:   ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          subject-name:   ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
