@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.9
 
 ############################################################
-# GLOBAL ARGs (with defaults) — apply to all stages
+# GLOBAL ARGs (with defaults)
 ############################################################
 ARG BASE_IMAGE=debian:bullseye-slim
 ARG PYTHON_VERSION=3.12
@@ -14,25 +14,25 @@ ARG MODE=dev         # "dev" or "prod"
 FROM ghcr.io/astral-sh/uv:0.7.6 AS uvbin
 
 ############################################################
-# BUILDER STAGE — install Python via uv, then deps via uv
+# BUILDER STAGE
 ############################################################
 FROM ${BASE_IMAGE} AS builder
 
-# Bring global ARGs into this stage’s scope
+# Bring build args into scope
 ARG PYTHON_VERSION
 ARG EXTRA
 ARG MODE
 
 LABEL org.opencontainers.image.source="https://github.com/<OWNER>/<REPO>"
 
-# Bring in uv & uvx
+# Import uv & uvx
 COPY --from=uvbin /uv /uv
 COPY --from=uvbin /uvx /uvx
 ENV PATH="/:${PATH}" \
     DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1
 
-# Install system deps
+# OS deps
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     curl git libssl-dev libffi-dev pkg-config && \
@@ -41,11 +41,11 @@ RUN apt-get update && \
 WORKDIR /app
 COPY pyproject.toml ./
 
-# 1️⃣ Install the requested Python interpreter so uv has a runtime
+# 1️⃣ Install Python interpreter via uv
 RUN --mount=type=cache,target=/root/.cache \
-    uv python install ${PYTHON_VERSION} --preview --default    # uv Python installer :contentReference[oaicite:2]{index=2}
+    uv python install ${PYTHON_VERSION} --preview --default
 
-# 2️⃣ Generate lockfile, sync & (in dev) compile
+# 2️⃣ Generate lock, sync & precompile (in dev)
 RUN --mount=type=cache,target=/root/.cache \
     uv lock && \
     if [ "$MODE" = "dev" ]; then \
@@ -56,29 +56,26 @@ RUN --mount=type=cache,target=/root/.cache \
     fi
 
 ############################################################
-# FINAL STAGE — runtime image
+# FINAL STAGE
 ############################################################
-# Re-declare BASE_IMAGE so Docker picks up the same build-arg :contentReference[oaicite:3]{index=3}
 ARG BASE_IMAGE
-FROM ${BASE_IMAGE} AS final
-
-# Bring MODE into this stage
 ARG MODE
+FROM ${BASE_IMAGE} AS final
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:${PATH}"
 
-# Runtime-only libs
+# Runtime libs only
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libssl1.1 && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy the completed venv from builder
+# Copy in the venv from builder
 COPY --from=builder /app/.venv /app/.venv
 
-# In prod, drop to non-root
+# Drop to non-root in prod
 RUN if [ "$MODE" = "prod" ]; then \
     useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app/.venv; \

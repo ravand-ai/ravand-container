@@ -1,5 +1,5 @@
 [project]
-name = "ravand-base"
+name = "pytorch-base"
 version = "0.1.0"
 requires-python = ">=3.10"
 
@@ -22,6 +22,7 @@ cu124 = [
 ]
 
 [tool.uv]
+# Define your two custom PyTorch indexes
 [[tool.uv.index]]
 name     = "pytorch-cpu"
 url      = "https://download.pytorch.org/whl/cpu"
@@ -32,7 +33,17 @@ name     = "pytorch-cu124"
 url      = "https://download.pytorch.org/whl/cu124"
 explicit = true
 
+# Map each package to the right index via an "extra" marker
 [tool.uv.sources]
-torch       = [{ index = "pytorch-cpu" }, { index = "pytorch-cu124" }]
-torchvision = [{ index = "pytorch-cpu" }, { index = "pytorch-cu124" }]
-torchaudio  = [{ index = "pytorch-cpu" }, { index = "pytorch-cu124" }]
+torch = [
+  { index = "pytorch-cpu",  marker = "extra == 'cpu'" },
+  { index = "pytorch-cu124", marker = "extra == 'cu124'" },
+]
+torchvision = [
+  { index = "pytorch-cpu",  marker = "extra == 'cpu'" },
+  { index = "pytorch-cu124", marker = "extra == 'cu124'" },
+]
+torchaudio = [
+  { index = "pytorch-cpu",  marker = "extra == 'cpu'" },
+  { index = "pytorch-cu124", marker = "extra == 'cu124'" },
+]
