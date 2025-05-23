@@ -27,6 +27,24 @@ Our goal is to offer developers and MLOps engineers a streamlined, reliable, and
 Below is a comprehensive list of all available Docker image tags. This table is automatically generated and updated whenever new images are built.
 
 <!-- IMAGES_TABLE_START -->
+
+| Python | Variant | Mode | Base Image | Tags |
+|--------|---------|------|------------|------|
+| 3.10 | cpu | dev | debian:bullseye-slim | ghcr.io/ravand-ai/ravand-container:py3.10-cpu-dev |
+| 3.10 | cpu | prod | debian:bullseye-slim | ghcr.io/ravand-ai/ravand-container:py3.10-cpu-prod |
+| 3.10 | cu124 | dev | nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04 | ghcr.io/ravand-ai/ravand-container:py3.10-cu124-dev |
+| 3.10 | cu124 | prod | nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04 | ghcr.io/ravand-ai/ravand-container:py3.10-cu124-prod |
+| 3.11 | cpu | dev | debian:bullseye-slim | ghcr.io/ravand-ai/ravand-container:py3.11-cpu-dev |
+| 3.11 | cpu | prod | debian:bullseye-slim | ghcr.io/ravand-ai/ravand-container:py3.11-cpu-prod |
+| 3.11 | cu124 | dev | nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04 | ghcr.io/ravand-ai/ravand-container:py3.11-cu124-dev |
+| 3.11 | cu124 | prod | nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04 | ghcr.io/ravand-ai/ravand-container:py3.11-cu124-prod |
+| 3.12 | cpu | dev | debian:bullseye-slim | ghcr.io/ravand-ai/ravand-container:py3.12-cpu-dev |
+| 3.12 | cpu | prod | debian:bullseye-slim | ghcr.io/ravand-ai/ravand-container:py3.12-cpu-prod |
+| 3.12 | cu124 | dev | nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04 | ghcr.io/ravand-ai/ravand-container:py3.12-cu124-dev |
+| 3.12 | cu124 | prod | nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04 | ghcr.io/ravand-ai/ravand-container:py3.12-cu124-prod |
+
+<!-- IMAGES_TABLE_END -->
+
 For details on each image (base OS, Python version, GPU support, dev vs prod), please refer to the table above.
 
 ### Image Tagging Convention
